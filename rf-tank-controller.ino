@@ -1,21 +1,51 @@
-#include <SPI.h>
+#include <printf.h>
 #include <nRF24L01.h>
+#include <RF24_config.h>
 #include <RF24.h>
 
-RF24 radio(7, 8); // CE, CSN
-const byte address[6] = "00001";
+// ManiacBug RF24 lib is found here
+// https://github.com/maniacbug/RF24
 
-void setup() {
-  Serial.begin(9600);
-  Serial.println("INIT");
+RF24 radio(53, 48); // CE, CSN
+const uint64_t pipes[2] = { 0xF0F0F0F0E1LL, 0xF0F0F0F0D2LL };
+
+typedef struct stateUpdate {
+  int controlBit = 1;
+  int motorLeft;
+  int motorRight;
+} StateUpdate;
+ 
+StateUpdate stateUpdate;
+
+void setup() {  
+  // Initialize serial communication
+  Serial.begin(57600);
+  Serial.println("System initializing");
+  printf_begin();
+
+  // Initialize radio module
   radio.begin();
-  radio.openWritingPipe(address);
-  radio.setPALevel(RF24_PA_MIN);
-  radio.stopListening();
+  radio.setRetries(15,15);
+  radio.openWritingPipe(pipes[0]);
+  radio.startListening();
+  radio.printDetails();
+
+  // Random seed
+  randomSeed(analogRead(0));
+
+  Serial.println("Initialized");
 }
 
-void loop() {
-  const char text[] = "Hello World";
-  radio.write(&text, sizeof(text));
-  delay(1000);
+void loop() {    
+  stateUpdate.motorLeft = random(60, 77);
+  stateUpdate.motorRight = random(60, 77);
+  
+  radio.stopListening();
+  if (radio.write(&stateUpdate, sizeof(stateUpdate))) {
+      printf("State update: Left [%d], Right [%d]\n", stateUpdate.motorLeft, stateUpdate.motorRight);
+  }
+
+  radio.startListening();
+  
+  delay(5000);
 }
